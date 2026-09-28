@@ -19,8 +19,8 @@ namespace {
 
 constexpr char kApiBase[] = "https://opendata.adsb.fi/api/v3/lat/";
 constexpr float kKmPerNm = 1.852f;
-constexpr int kConnectAttemptMs = 200;
-constexpr unsigned long kRequestTimeoutMs = 10000;
+constexpr int kConnectTimeoutMs = 5000;  // TLS handshake needs room
+constexpr unsigned long kRequestTimeoutMs = 6000;
 
 Aircraft s_aircraft[kMaxAircraft];
 size_t s_aircraft_count = 0;
@@ -50,7 +50,7 @@ void pollNetwork() {
 }
 
 int performGetWithPoll(HTTPClient& http) {
-  http.setConnectTimeout(kConnectAttemptMs);
+  http.setConnectTimeout(kConnectTimeoutMs);
   const unsigned long deadline = millis() + kRequestTimeoutMs;
   while (millis() < deadline) {
     pollNetwork();
@@ -128,31 +128,6 @@ class PollingSocketSource {
 };
 
 using BodyReader = services::http::BodyFramer<PollingSocketSource>;
-
-/**
- * Builds the deserialization filter. The keys below are the only ones the
- * radar reads, out of the ~40 each adsb.fi v3 record carries; the parser
- * skips the rest (rssi, mlat, tisb, nic, messages, ...) without storing them.
- */
-void buildAircraftFilter(JsonDocument& filter) {
-  // A filter array applies its first element to every element of the input.
-  JsonObject plane = filter["ac"].add<JsonObject>();
-  plane["lat"] = true;
-  plane["lon"] = true;
-  plane["track"] = true;
-  plane["true_heading"] = true;
-  plane["mag_heading"] = true;
-  plane["dir"] = true;
-  plane["gs"] = true;
-  plane["tas"] = true;
-  plane["ias"] = true;
-  plane["alt_baro"] = true;
-  plane["alt_geom"] = true;
-  plane["seen_pos"] = true;
-  plane["flight"] = true;
-  plane["hex"] = true;
-  plane["t"] = true;
-}
 
 float kmToNauticalMiles(float km) { return km / kKmPerNm; }
 
@@ -311,6 +286,16 @@ bool fetchUpdate(double center_lat, double center_lon, float fetch_radius_km) {
   url += "/dist/";
   url += String(dist_nm, 1);
 
+  // Keep only the fields we render; the rest never reaches RAM.
+  JsonDocument filter;
+  JsonObject f = filter["ac"].add<JsonObject>();
+  for (const char* key :
+       {"lat", "lon", "true_heading", "mag_heading", "track", "dir", "gs",
+        "tas", "ias", "alt_baro", "alt_geom", "seen_pos", "flight", "hex", "t",
+        "category"}) {
+    f[key] = true;
+  }
+
   WiFiClientSecure client;
   client.setInsecure();
 
@@ -339,13 +324,6 @@ bool fetchUpdate(double center_lat, double center_lon, float fetch_radius_km) {
     http.end();
     return false;
   }
-
-  // Parse straight off the socket, with a filter that keeps only the fields
-  // the radar reads. The body is never held in RAM as a whole and the skipped
-  // fields never get a document slot, so peak heap stays flat no matter how
-  // many aircraft the API returns.
-  JsonDocument filter;
-  buildAircraftFilter(filter);
 
   // On HTTP/1.1 the CDN answers with Transfer-Encoding: chunked, and
   // getStreamPtr() hands back the raw socket -- chunk sizes and all. BodyFramer
