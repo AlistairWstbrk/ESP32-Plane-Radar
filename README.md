@@ -1,8 +1,33 @@
 # Plane Radar
 
+> **Fork** of [MatixYo/ESP32-Plane-Radar](https://github.com/MatixYo/ESP32-Plane-Radar) — adds **per-class aircraft icons and colours**.
+
 <img width="800" height="450" alt="plane-radar" src="https://github.com/user-attachments/assets/716d0992-dab8-47ba-8f1a-2aec7f607419" />
 
 **3D printed case (STL + assembly):** [MakerWorld](https://makerworld.com/en/models/2872376-esp32-plane-radar-live-ads-b-on-a-round-display#profileId-3207083) · **Firmware:** [Releases](https://github.com/MatixYo/ESP32-Plane-Radar/releases)
+
+---
+
+## Fork changes — per-class aircraft icons
+
+Each ADS-B target is classified and rendered with a distinct icon and colour:
+
+| Class | Icon | Colour | Detection method |
+|-------|------|--------|-----------------|
+| **Commercial** | Fuselage + wing bar + tail fins | Cyan | Cat A3–A5, or ICAO airline callsign (e.g. BAW123) |
+| **Military** | Bold filled triangle | Red-orange | Known military ICAO hex blocks (RAF, USAF, Luftwaffe, RAAF, RCAF) |
+| **Helicopter** | Rotor-disk circle + heading arrow | Amber | ADS-B emitter category A7 (rotorcraft) |
+| **Private / GA** | Narrow filled triangle | Lime green | Everything else |
+
+![Radar preview showing per-class icons](docs/radar_full.png)
+
+> Simulated preview — commercial crosses (cyan), helicopter circle (amber), private triangles (green), military triangles (red-orange), and an edge dot for an out-of-range target.
+
+### Flash pre-built firmware
+
+See **[`release/FLASHING.md`](release/FLASHING.md)** for one-command flashing with `esptool.py` (Mac, Linux, Windows). No build tools needed — all four ESP32-C3 binary segments are included.
+
+---
 
 Firmware for an **ESP32-C3 Super Mini** and a **1.28″ round GC9A01** display (240×240). Shows a circular **ADS-B radar** around your configured location, with **WiFiManager** for first-time setup.
 
